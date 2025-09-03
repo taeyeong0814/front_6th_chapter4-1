@@ -237,12 +237,23 @@ function ProductDetail({ product, relatedProducts = [] }) {
 export const ProductDetailPage = withLifecycle(
   {
     onMount: () => {
-      loadProductDetailForPage(router.params.id);
+      // SSR에서 이미 데이터가 있으면 로드하지 않음
+      if (!productStore.getState().currentProduct) {
+        loadProductDetailForPage(router.params.id);
+      }
     },
     watches: [() => [router.params.id], () => loadProductDetailForPage(router.params.id)],
   },
-  () => {
-    const { currentProduct: product, relatedProducts = [], error, loading } = productStore.getState();
+  (props = {}) => {
+    // SSR에서 전달받은 props 우선 사용, 없으면 store에서 가져오기
+    const {
+      currentProduct: product,
+      relatedProducts = [],
+      error,
+      loading,
+    } = props.currentProduct
+      ? { currentProduct: props.currentProduct, relatedProducts: props.products || [], error: null, loading: false }
+      : productStore.getState();
 
     return PageWrapper({
       headerLeft: `

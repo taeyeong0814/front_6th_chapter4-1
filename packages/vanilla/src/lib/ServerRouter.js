@@ -54,3 +54,24 @@ export class ServerRouter extends BaseRouter {
     this.updateRoute(this.getCurrentUrl());
   }
 }
+
+// ===== SSR용 Mock 데이터 함수들 =====
+
+// 상품 목록 데이터 가져오기 (SSR용)
+export async function getProductsSSR(params = {}) {
+  const { getProductsOnServer } = await import("../mocks/server.js");
+  return getProductsOnServer(params);
+}
+
+// 상품 상세 데이터 가져오기 (SSR용)
+export async function getProductSSR(productId) {
+  const { getProductsOnServer } = await import("../mocks/server.js");
+  const { products } = getProductsOnServer({});
+  return products.find((p) => p.productId === productId);
+}
+
+// 카테고리 데이터 가져오기 (SSR용)
+export async function getCategoriesSSR() {
+  const { getUniqueCategories } = await import("../mocks/server.js");
+  return getUniqueCategories();
+}
