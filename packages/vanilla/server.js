@@ -50,6 +50,10 @@ app.use("*all", async (req, res) => {
       template = await fs.readFile("./index.html", "utf-8");
       template = await vite.transformIndexHtml(url, template);
       render = (await vite.ssrLoadModule("/src/main-server.js")).render;
+    } else {
+      // 프로덕션 환경에서는 HTML 변환 없이 템플릿 그대로 사용
+      template = await fs.readFile("./dist/vanilla/index.html", "utf-8");
+      render = (await import("./dist/vanilla-ssr/main-server.js")).render;
     }
 
     const rendered = await render(url, req.query);

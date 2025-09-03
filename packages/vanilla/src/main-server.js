@@ -68,6 +68,7 @@ router.addRoute("/product/:id/", () => {
   };
 });
 
+// 404 페이지는 가장 마지막에 등록 (catch-all) - 더 구체적인 패턴 사용
 router.addRoute(".*", () => {
   return {
     initialData: {},
@@ -121,12 +122,85 @@ export const render = async (url, query) => {
     }
 
     // 라우터 초기화 및 쿼리 설정
+    router.start();
     router.setUrl(pathname, "http://localhost");
     router.query = query;
-    router.start();
 
-    // 라우트 찾기 - pathname 대신 전체 URL 사용
-    const routeInfo = router.findRoute(url);
+    // 라우트 찾기 - 직접 매칭 로직 구현
+    let routeInfo = null;
+
+    // 홈페이지 라우트 매칭
+    if (pathname === "/") {
+      routeInfo = {
+        path: "/",
+        handler: () => {
+          const {
+            products,
+            pagination: { total: totalCount },
+          } = getProductsOnServer(query);
+          const categories = getUniqueCategories();
+
+          const results = {
+            products,
+            categories,
+            totalCount,
+          };
+
+          const initialData = {
+            ...results,
+            filters: {
+              search: query.search || "",
+              category1: query.category1 || "",
+              category2: query.category2 || "",
+              sort: query.sort || "price_asc",
+              limit: query.limit || 20,
+            },
+          };
+
+          return {
+            initialData,
+            html: HomePage(results),
+            head: generateHead(query),
+          };
+        },
+        params: {},
+      };
+    }
+    // 상품 상세 페이지 라우트 매칭
+    else if (pathname.startsWith("/product/") && pathname.endsWith("/")) {
+      const id = pathname.replace("/product/", "").replace("/", "");
+      routeInfo = {
+        path: "/product/:id/",
+        handler: () => {
+          const product = getProductOnServer(id);
+
+          if (!product) {
+            return {
+              initialData: { error: "Product not found" },
+              html: NotFoundPage(),
+              head: "<title>상품을 찾을 수 없습니다 - 쇼핑몰</title>",
+            };
+          }
+
+          const { products: allProducts } = getProductsOnServer({});
+          const relatedProducts = allProducts
+            .filter((p) => p.productId !== id && p.category1 === product.category1)
+            .slice(0, 4);
+
+          const results = {
+            currentProduct: product,
+            products: relatedProducts,
+          };
+
+          return {
+            initialData: results,
+            html: ProductDetailPage(results),
+            head: generateProductHead(product),
+          };
+        },
+        params: { id },
+      };
+    }
 
     if (!routeInfo || !routeInfo.handler) {
       console.error("❌ 라우트를 찾을 수 없음:", pathname);
