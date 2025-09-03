@@ -31,7 +31,6 @@ export class Router extends BaseRouter {
 
   /**
    * 네비게이션 실행
-
    */
   push(url) {
     try {
@@ -48,6 +47,7 @@ export class Router extends BaseRouter {
       console.error("라우터 네비게이션 오류:", error);
     }
   }
+
   /**
    * 라우터 시작
    */

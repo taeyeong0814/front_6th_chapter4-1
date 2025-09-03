@@ -11,27 +11,21 @@ export const HomePage = withLifecycle(
         console.log("이 코드는 서버에서 실행이 되고 ");
         return;
       }
-      // window 참조를 안전하게 처리
-      try {
-        if (window.__INITIAL_DATA__?.products?.length > 0) {
-          console.log("이 코드는 클라이언트에서 실행이 되는데, __INITIAL_DATA__ 가 있을 때에만!");
-          const { products, categories, totalCount } = window.__INITIAL_DATA__;
-          productStore.dispatch({
-            type: PRODUCT_ACTIONS.SETUP,
-            payload: {
-              products,
-              categories,
-              totalCount,
-              loading: false,
-              status: "done",
-            },
-          });
-          return;
-        }
-      } catch (error) {
-        console.log("window.__INITIAL_DATA__ 접근 에러:", error);
+      if (window.__INITIAL_DATA__?.products?.length > 0) {
+        console.log("이 코드는 클라이언트에서 실행이 되는데, __INITIAL_DATA__ 가 있을 때에만!");
+        const { products, categories, totalCount } = window.__INITIAL_DATA__;
+        productStore.dispatch({
+          type: PRODUCT_ACTIONS.SETUP,
+          payload: {
+            products,
+            categories,
+            totalCount,
+            loading: false,
+            status: "done",
+          },
+        });
+        return;
       }
-
       console.log("이 코드는 아무것도 없을 때!");
       loadProductsAndCategories();
     },

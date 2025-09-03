@@ -23,7 +23,7 @@ const ErrorContent = ({ error }) => `
       </div>
       <h1 class="text-xl font-bold text-gray-900 mb-2">상품을 찾을 수 없습니다</h1>
       <p class="text-gray-600 mb-4">${error || "요청하신 상품이 존재하지 않습니다."}</p>
-      <button 
+      <button onclick="window.history.back()" 
               class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 mr-2">
         이전 페이지
       </button>
@@ -247,7 +247,7 @@ export const ProductDetailPage = withLifecycle(
     return PageWrapper({
       headerLeft: `
         <div class="flex items-center space-x-3">
-          <button 
+          <button onclick="window.history.back()" 
                   class="p-2 text-gray-700 hover:text-gray-900 transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
