@@ -23,7 +23,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": false
   },
   "include": ["packages/*/src/**/*"],
   "exclude": ["node_modules", "dist", "build"]

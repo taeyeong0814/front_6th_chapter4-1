@@ -1,104 +1,61 @@
-import { HomePage } from "./pages/HomePage.js";
-import { ProductDetailPage } from "./pages/ProductDetailPage.js";
-import { NotFoundPage } from "./pages/NotFoundPage.js";
+// ===== 간단한 라우터 =====
+import { HomePage, NotFoundPage, ProductDetailPage } from "./pages";
+import { router } from "./router";
+import { getProductsOnServer, getUniqueCategories } from "./mocks/server.js";
 
-// 실제 상품 데이터를 가져오는 함수
-async function getProductsServer() {
-  try {
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const { fileURLToPath } = await import("url");
+// ===== 라우트 등록 =====
+router.addRoute("/", () => {
+  const {
+    products,
+    pagination: { total: totalCount },
+  } = getProductsOnServer(router.query);
+  const categories = getUniqueCategories();
 
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
+  const results = {
+    products,
+    categories,
+    totalCount,
+  };
 
-    const data = await fs.readFile(path.join(__dirname, "mocks/items.json"), "utf-8");
-    const products = JSON.parse(data);
+  return {
+    initialData: results,
+    html: HomePage(results),
+    head: "<title>쇼핑몰 홈</title>",
+  };
+});
+router.addRoute("/product/:id/", () => {
+  return {
+    initialData: { products: [] },
+    html: ProductDetailPage(),
+    head: "<title>쇼핑몰 상세페이지</title>",
+  };
+});
+router.addRoute(".*", () => {
+  return {
+    initialData: {},
+    html: NotFoundPage(),
+    head: "<title>페이지 없음</title>",
+  };
+});
 
-    return products.slice(0, 20);
-  } catch (error) {
-    console.error("상품 데이터 로드 에러:", error);
-    return [];
-  }
-}
-
+// ===== 메인 렌더 함수 =====
 export const render = async (url, query) => {
-  console.log("서버 렌더링:", { url, query });
-
   try {
-    if (url === "/" || url === "") {
-      // 실제 상품 데이터를 가져와서 HomePage에 전달
-      const products = await getProductsServer();
-      const categories = [];
-      const totalCount = products.length;
+    router.setUrl(url, "http://localhost");
+    router.query = query;
+    router.start();
+    const routeInfo = router.findRoute(url);
 
-      console.log("홈페이지 렌더링:", { productsCount: products.length });
+    const result = await routeInfo.handler(routeInfo.params);
+    console.log("✅ SSR 완료");
 
-      const html = HomePage({
-        products,
-        categories,
-        totalCount,
-      });
-
-      return {
-        html: `<div id="root">${html}</div>`,
-        head: "<title>쇼핑몰 홈페이지</title>",
-        initialData: {
-          page: "home",
-          products,
-          categories,
-          totalCount,
-        },
-      };
-    }
-
-    if (url.startsWith("/product/")) {
-      const productId = url.split("/")[2];
-
-      console.log("상품 상세 페이지 렌더링:", { productId });
-
-      // ProductDetailPage에 props 전달
-      const html = ProductDetailPage({
-        productId,
-        url,
-        query,
-      });
-
-      return {
-        html: `<div id="root">${html}</div>`,
-        head: "<title>상품 상세 - 쇼핑몰</title>",
-        initialData: {
-          page: "product",
-          productId,
-        },
-      };
-    }
-
-    console.log("404 페이지 렌더링");
-
-    // NotFoundPage 호출
-    const html = NotFoundPage();
-    return {
-      html: `<div id="root">${html}</div>`,
-      head: "<title>404 - 페이지 없음</title>",
-      initialData: { page: "not-found", url },
-    };
+    return result;
   } catch (error) {
-    console.error("서버 렌더링 에러:", error);
-
+    console.error("❌ SSR 에러:", error);
     return {
-      html: `
-        <div id="root">
-          <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold text-gray-900 mb-4">서버 오류</h1>
-              <p class="text-gray-600">잠시 후 다시 시도해주세요.</p>
-            </div>
-          </div>
-        </div>
-      `,
-      head: "<title>서버 오류 - 쇼핑몰</title>",
-      initialData: { page: "error", error: error.message },
+      head: "<title>에러</title>",
+      html: "<div>서버 오류가 발생했습니다.</div>",
+      initialData: { error: error.message },
     };
   }
 };
