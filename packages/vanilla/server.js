@@ -10,6 +10,7 @@ const prod = process.env.NODE_ENV === "production";
 const port = process.env.PORT || 5173;
 const base = process.env.BASE || (prod ? "/front_6th_chapter4-1/vanilla/" : "/");
 
+// Express 서버 설정
 const app = express();
 
 async function startServer() {
