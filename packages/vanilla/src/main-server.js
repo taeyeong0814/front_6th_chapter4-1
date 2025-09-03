@@ -1,8 +1,8 @@
 // ===== 간단한 라우터 =====
-import { HomePage, NotFoundPage, ProductDetailPage } from "./pages";
-import { router } from "./router";
+import { HomePage, NotFoundPage, ProductDetailPage } from "./pages/index.js";
+import { router } from "./router/index.js";
 import { getProductsOnServer, getUniqueCategories } from "./mocks/server.js";
-import { PRODUCT_ACTIONS, productStore } from "./stores";
+import { PRODUCT_ACTIONS, productStore } from "./stores/index.js";
 
 // ===== 라우트 등록 =====
 router.addRoute("/", () => {
@@ -121,11 +121,6 @@ export const render = async (url, query) => {
       pathname = "/";
     }
 
-    // 라우터 초기화 및 쿼리 설정
-    router.start();
-    router.setUrl(pathname, "http://localhost");
-    router.query = query;
-
     // 라우트 찾기 - 직접 매칭 로직 구현
     let routeInfo = null;
 
@@ -167,39 +162,45 @@ export const render = async (url, query) => {
       };
     }
     // 상품 상세 페이지 라우트 매칭
-    else if (pathname.startsWith("/product/") && pathname.endsWith("/")) {
-      const id = pathname.replace("/product/", "").replace("/", "");
-      routeInfo = {
-        path: "/product/:id/",
-        handler: () => {
-          const product = getProductOnServer(id);
+    else if (pathname.startsWith("/product/")) {
+      // /product/ID/ 또는 /product/ID 패턴 매칭
+      const productIdMatch = pathname.match(/^\/product\/([^/]+)\/?$/);
 
-          if (!product) {
-            return {
-              initialData: { error: "Product not found" },
-              html: NotFoundPage(),
-              head: "<title>상품을 찾을 수 없습니다 - 쇼핑몰</title>",
+      if (productIdMatch) {
+        const id = productIdMatch[1];
+
+        routeInfo = {
+          path: "/product/:id/",
+          handler: (params) => {
+            const product = getProductOnServer(params.id);
+
+            if (!product) {
+              return {
+                initialData: { error: "Product not found" },
+                html: NotFoundPage(),
+                head: "<title>상품을 찾을 수 없습니다 - 쇼핑몰</title>",
+              };
+            }
+
+            const { products: allProducts } = getProductsOnServer({});
+            const relatedProducts = allProducts
+              .filter((p) => p.productId !== params.id && p.category1 === product.category1)
+              .slice(0, 4);
+
+            const results = {
+              currentProduct: product,
+              products: relatedProducts,
             };
-          }
 
-          const { products: allProducts } = getProductsOnServer({});
-          const relatedProducts = allProducts
-            .filter((p) => p.productId !== id && p.category1 === product.category1)
-            .slice(0, 4);
-
-          const results = {
-            currentProduct: product,
-            products: relatedProducts,
-          };
-
-          return {
-            initialData: results,
-            html: ProductDetailPage(results),
-            head: generateProductHead(product),
-          };
-        },
-        params: { id },
-      };
+            return {
+              initialData: results,
+              html: ProductDetailPage({ currentProduct: product, products: relatedProducts }),
+              head: generateProductHead(product),
+            };
+          },
+          params: { id },
+        };
+      }
     }
 
     if (!routeInfo || !routeInfo.handler) {
