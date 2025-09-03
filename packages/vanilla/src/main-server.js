@@ -154,7 +154,11 @@ export const render = async (url, query) => {
 
           return {
             initialData,
-            html: HomePage(results),
+            html: HomePage({
+              ...results,
+              searchQuery: query.search || "",
+              filters: initialData.filters,
+            }),
             head: generateHead(query),
           };
         },

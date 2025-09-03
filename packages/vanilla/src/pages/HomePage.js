@@ -50,7 +50,7 @@ export const HomePage = withLifecycle(
         : productStore.getState();
     const { search: searchQuery, limit, sort, category1, category2 } = router.query;
     const { products, loading, error, totalCount, categories } = productState;
-    const category = { category1, category2 };
+
     const hasMore = products.length < totalCount;
 
     return PageWrapper({
@@ -61,7 +61,16 @@ export const HomePage = withLifecycle(
       `.trim(),
       children: `
         <!-- 검색 및 필터 -->
-        ${SearchBar({ searchQuery, limit, sort, category, categories })}
+        ${SearchBar({
+          searchQuery: props.searchQuery || searchQuery || "",
+          limit: props.filters?.limit || limit || 20,
+          sort: props.filters?.sort || sort || "price_asc",
+          category: {
+            category1: props.filters?.category1 || category1 || "",
+            category2: props.filters?.category2 || category2 || "",
+          },
+          categories: props.categories || categories || {},
+        })}
         
         <!-- 상품 목록 -->
         <div class="mb-6">
