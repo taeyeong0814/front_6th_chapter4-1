@@ -1,70 +1,51 @@
 import fs from "fs";
 import { createServer } from "vite";
-
 const vite = await createServer({
   server: { middlewareMode: true },
   appType: "custom",
 });
 
-const productApi = await vite.ssrLoadModule("./src/api/productApi.js");
+const { getProducts } = await vite.ssrLoadModule("./src/api/productApi.js");
+
+// main-server.js 사용 (이미 작동하는 방식)
 const mainServer = await vite.ssrLoadModule("./src/main-server.js");
 
-async function generateStaticSite(url) {
-  try {
-    // HTML 템플릿 읽기
-    const template = fs.readFileSync("../../dist/vanilla/index.html", "utf-8");
+async function generateStaticSite(url, query) {
+  // HTML 템플릿 읽기
+  const template = fs.readFileSync("./index.html", "utf-8");
 
-    // 어플리케이션 렌더링하기
-    const appHtml = await mainServer.render(url, {});
+  const rendered = await mainServer.render(url, query);
 
-    // 결과 HTML 생성하기
-    let result = template
-      .replace("<!--app-head-->", appHtml.head || "")
-      .replace("<!--app-html-->", appHtml.html || "")
-      .replace(
-        `</head>`,
-        `
+  const html = template
+    .replace(`<!--app-head-->`, rendered.head ?? "")
+    .replace(`<!--app-html-->`, rendered.html ?? "")
+    .replace(
+      `</head>`,
+      `
         <script>
-          window.__INITIAL_DATA__ = ${JSON.stringify(appHtml.initialData || {})};
+          window.__INITIAL_DATA__ = ${JSON.stringify(rendered.initialData || {})};
         </script>
         </head>
       `,
-      );
+    );
 
-    if (url === "/") {
-      fs.writeFileSync("../../dist/vanilla/index.html", result);
-    } else if (url.startsWith("/product/")) {
-      // 상품 ID 추출
-      const productId = url.replace("/product/", "").replace("/", "");
-      const productDir = `../../dist/vanilla/product/${productId}`;
-
-      // 디렉토리가 없으면 생성
-      if (!fs.existsSync(productDir)) {
-        fs.mkdirSync(productDir, { recursive: true });
-      }
-
-      fs.writeFileSync(`${productDir}/index.html`, result);
-    } else {
-      fs.writeFileSync("../../dist/vanilla/404.html", result);
+  if (url == "/404") {
+    fs.writeFileSync("../../dist/vanilla/404.html", html);
+  } else {
+    if (!fs.existsSync(`../../dist/vanilla${url}`)) {
+      fs.mkdirSync(`../../dist/vanilla${url}`, { recursive: true });
     }
-  } catch (error) {
-    console.error(`❌ ${url} 페이지 생성 실패:`, error.message);
+    fs.writeFileSync(`../../dist/vanilla${url}/index.html`, html);
   }
 }
 
-// 상품 데이터 가져오기
-const products = await productApi.getProducts();
+const { products } = await getProducts();
 
 // 실행
-await generateStaticSite("/");
-
-for (const product of products.products) {
-  await generateStaticSite(`/product/${product.productId}`);
+generateStaticSite("/", {});
+generateStaticSite("/404", {});
+for (let i = 0; i < products.length; i++) {
+  generateStaticSite(`/product/${products[i].productId}`, {});
 }
 
-await generateStaticSite("/404");
-
-// Vite 서버 종료
-await vite.close();
-
-console.log("🎉 SSG 완료!");
+vite.close();
