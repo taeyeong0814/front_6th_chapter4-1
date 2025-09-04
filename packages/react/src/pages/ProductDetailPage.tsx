@@ -1,11 +1,51 @@
 import { ProductDetail, useLoadProductDetail, useProductStore } from "../entities";
 import { PageWrapper } from "./PageWrapper";
 import { ErrorContent, PublicImage } from "../components";
+import { useEffect, useState } from "react";
 
-export const ProductDetailPage = () => {
-  const { currentProduct: product, error, loading } = useProductStore();
+interface Product {
+  productId: string;
+  title: string;
+  link: string;
+  image: string;
+  lprice: string;
+  hprice: string;
+  mallName: string;
+  productType: string;
+  brand: string;
+  maker: string;
+  category1: string;
+  category2: string;
+  category3: string;
+  category4: string;
+}
+
+interface ProductDetailPageProps {
+  currentProduct?: Product;
+  products?: Product[];
+}
+
+export const ProductDetailPage = ({ currentProduct: propProduct }: ProductDetailPageProps = {}) => {
+  const { currentProduct: storeProduct, error, loading } = useProductStore();
+  const [product, setProduct] = useState(propProduct || storeProduct);
 
   useLoadProductDetail();
+
+  useEffect(() => {
+    // SSR/SSG에서 전달된 initialData 확인
+    const initialData = (window as { __INITIAL_DATA__?: { currentProduct?: Product } }).__INITIAL_DATA__;
+
+    if (initialData) {
+      if (initialData.currentProduct) {
+        setProduct(initialData.currentProduct);
+      }
+      // initialData 사용 후 제거 (hydration 완료)
+      delete (window as { __INITIAL_DATA__?: { currentProduct?: Product } }).__INITIAL_DATA__;
+    } else if (propProduct) {
+      // props로 전달된 데이터 사용
+      setProduct(propProduct);
+    }
+  }, [propProduct]);
 
   return (
     <PageWrapper
@@ -31,7 +71,12 @@ export const ProductDetailPage = () => {
           </div>
         )}
         {error && <ErrorContent error={error} />}
-        {product && <ProductDetail {...product} />}
+        {product && (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{product.title}</h1>
+            <ProductDetail {...product} />
+          </>
+        )}
       </div>
     </PageWrapper>
   );

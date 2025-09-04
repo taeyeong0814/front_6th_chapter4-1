@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { loadNextProducts, loadProductsAndCategories, ProductList, SearchBar } from "../entities";
+import { useEffect, useState } from "react";
+import { loadNextProducts, loadProductsAndCategories, ProductList, SearchBar, type Product } from "../entities";
 import { PageWrapper } from "./PageWrapper";
 
 const headerLeft = (
@@ -26,13 +26,34 @@ const unregisterScrollHandler = () => {
   scrollHandlerRegistered = false;
 };
 
-export const HomePage = () => {
+interface HomePageProps {
+  products?: Product[];
+  totalCount?: number;
+}
+
+export const HomePage = ({ products: propProducts, totalCount: propTotalCount }: HomePageProps = {}) => {
+  const [, setSsrData] = useState({ products: propProducts, totalCount: propTotalCount });
+
   useEffect(() => {
+    // SSR/SSG에서 전달된 initialData 확인
+    const initialData = (window as { __INITIAL_DATA__?: { products?: Product[]; totalCount?: number } })
+      .__INITIAL_DATA__;
+
+    if (initialData) {
+      setSsrData({
+        products: initialData.products || propProducts,
+        totalCount: initialData.totalCount || propTotalCount,
+      });
+      // initialData 사용 후 제거 (hydration 완료)
+      delete (window as { __INITIAL_DATA__?: { products?: Product[]; totalCount?: number } }).__INITIAL_DATA__;
+    }
+
+    // CSR 로직 실행 (기존 로직 유지)
     registerScrollHandler();
     loadProductsAndCategories();
 
     return unregisterScrollHandler;
-  }, []);
+  }, [propProducts, propTotalCount]);
 
   return (
     <PageWrapper headerLeft={headerLeft}>

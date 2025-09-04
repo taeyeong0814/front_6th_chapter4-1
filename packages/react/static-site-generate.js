@@ -1,18 +1,52 @@
-import { renderToString } from "react-dom/server";
-import { createElement } from "react";
 import fs from "fs";
+import { createServer } from "vite";
+import items from "./src/mocks/items.json";
 
-async function generateStaticSite() {
+const vite = await createServer({
+  server: { middlewareMode: true },
+  appType: "custom",
+});
+
+// main-server.tsx 사용
+const mainServer = await vite.ssrLoadModule("./src/main-server.tsx");
+
+async function generateStaticSite(url) {
   // HTML 템플릿 읽기
-  const template = fs.readFileSync("../../dist/react/index.html", "utf-8");
+  const template = fs.readFileSync("./index.html", "utf-8");
 
-  // 어플리케이션 렌더링하기
-  const appHtml = renderToString(createElement("div", null, "안녕하세요"));
+  const rendered = await mainServer.render(url);
 
-  // 결과 HTML 생성하기
-  const result = template.replace("<!--app-html-->", appHtml);
-  fs.writeFileSync("../../dist/react/index.html", result);
+  const html = template
+    .replace(`<!--app-head-->`, rendered.head ?? "")
+    .replace(`<!--app-html-->`, rendered.html ?? "")
+    .replace(
+      `</head>`,
+      `
+        <script>
+          window.__INITIAL_DATA__ = ${JSON.stringify(rendered.initialData || {})};
+        </script>
+        </head>
+      `,
+    );
+
+  if (url === "/404") {
+    fs.writeFileSync("../../dist/react/404.html", html);
+  } else {
+    if (!fs.existsSync(`../../dist/react${url}`)) {
+      fs.mkdirSync(`../../dist/react${url}`, { recursive: true });
+    }
+    fs.writeFileSync(`../../dist/react${url}/index.html`, html);
+  }
 }
 
 // 실행
-generateStaticSite();
+generateStaticSite("/");
+generateStaticSite("/404");
+
+// 실제 상품 데이터로 상품 상세 페이지 생성
+for (let i = 0; i < Math.min(items.length, 20); i++) {
+  // 처음 20개만
+  generateStaticSite(`/product/${items[i].productId}`);
+}
+
+vite.close();
