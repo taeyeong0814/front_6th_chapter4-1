@@ -2,13 +2,30 @@ import { renderToString } from "react-dom/server";
 import { App } from "./App";
 import { router } from "./router";
 import { loadHomePageData, loadProductDetailData } from "./services/ssr-data";
-import { PRODUCT_ACTIONS, productStore } from "./entities";
-import type { QueryPayload } from "@hanghae-plus/lib";
+import { PRODUCT_ACTIONS, productStore, type Product } from "./entities";
+import { HomePage, ProductDetailPage } from "./pages";
+import type { QueryPayload, StringRecord } from "@hanghae-plus/lib";
+
+interface InitialData {
+  products?: Product[];
+  categories?: Record<string, Record<string, string | StringRecord>>;
+  totalCount?: number;
+  currentProduct?: Product;
+  relatedProducts?: Product[];
+  filters?: {
+    searchQuery: string;
+    category: { category1: string; category2: string };
+    sort: string;
+    limit: number;
+  };
+}
 
 export const render = async (url: string, query: QueryPayload) => {
+  // URL 보정: 빈 문자열인 경우 "/", "/"로 시작하지 않으면 "/" 추가
+  const actualUrl = url;
+
   // URL에서 쿼리 파라미터 파싱
   const urlObj = new URL(url, "http://localhost");
-  const pathname = urlObj.pathname;
   const searchQuery = urlObj.searchParams.get("search") || "";
   const category1 = urlObj.searchParams.get("category1") || "";
   const category2 = urlObj.searchParams.get("category2") || "";
@@ -20,51 +37,17 @@ export const render = async (url: string, query: QueryPayload) => {
   router.query = { ...query };
 
   // URL에 따라 필요한 데이터 미리 로드
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let initialData: any = {};
+  let initialData: InitialData = {};
 
   try {
-    // URL 패턴 기반으로 직접 분기 처리 (Universal Router)
-    if (pathname === "/" || pathname === "" || pathname === "/front_6th_chapter4-1/react/") {
+    // URL 패턴에 따라 데이터 로드
+    if (router.target === HomePage) {
       // 홈페이지 - 상품 목록 데이터 로드
-      const homeData = await loadHomePageData(url);
+      const homeData = await loadHomePageData(actualUrl);
       if (homeData) {
-        // 검색 및 필터링 적용
-        let filteredProducts = homeData.products;
-
-        if (searchQuery) {
-          filteredProducts = filteredProducts.filter((product) =>
-            product.title.toLowerCase().includes(searchQuery.toLowerCase()),
-          );
-        }
-
-        if (category1) {
-          filteredProducts = filteredProducts.filter((product) => product.category1 === category1);
-        }
-
-        if (category2) {
-          filteredProducts = filteredProducts.filter((product) => product.category2 === category2);
-        }
-
-        // 정렬 적용
-        if (sort === "price_desc") {
-          filteredProducts.sort((a, b) => parseInt(b.lprice) - parseInt(a.lprice));
-        } else if (sort === "name_asc") {
-          filteredProducts.sort((a, b) => a.title.localeCompare(b.title));
-        } else if (sort === "name_desc") {
-          filteredProducts.sort((a, b) => b.title.localeCompare(a.title));
-        } else {
-          filteredProducts.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
-        }
-
-        // 개수 제한 적용
-        filteredProducts = filteredProducts.slice(0, limit);
-
         // 검색 필터 정보를 포함한 initialData 생성
         initialData = {
           ...homeData,
-          products: filteredProducts,
-          totalCount: filteredProducts.length,
           filters: {
             searchQuery,
             category: { category1, category2 },
@@ -77,18 +60,18 @@ export const render = async (url: string, query: QueryPayload) => {
         productStore.dispatch({
           type: PRODUCT_ACTIONS.SETUP,
           payload: {
-            products: filteredProducts,
+            products: homeData.products,
             categories: homeData.categories,
-            totalCount: filteredProducts.length,
+            totalCount: homeData.totalCount,
             loading: false,
             status: "done",
             error: null,
           },
         });
       }
-    } else if (pathname.startsWith("/product/") || pathname.includes("/product/")) {
+    } else if (router.target === ProductDetailPage) {
       // 상품 상세 페이지 - 해당 상품 데이터 로드
-      const productId = pathname.split("/product/")[1]?.replace("/", "") || "";
+      const productId = router.params.id;
       const productData = await loadProductDetailData(productId);
       if (productData) {
         initialData = productData;
@@ -113,12 +96,12 @@ export const render = async (url: string, query: QueryPayload) => {
 
     // 페이지별 meta title 생성
     let pageTitle = "React Shopping App";
-    if (pathname === "/" || pathname === "" || pathname === "/front_6th_chapter4-1/react/") {
+    if (router.target === HomePage) {
       pageTitle = "쇼핑몰 - 홈";
-    } else if (pathname.startsWith("/product/") || pathname.includes("/product/")) {
+    } else if (router.target === ProductDetailPage) {
       const productName = initialData?.currentProduct?.title || "상품";
       pageTitle = `${productName} - 쇼핑몰`;
-    } else if (!pathname) {
+    } else if (!router.target) {
       pageTitle = "404 - Page Not Found";
     }
 
