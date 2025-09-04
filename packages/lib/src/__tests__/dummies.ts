@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Router } from "../Router.ts";
+import { Router } from "../routers";
 
 interface CounterState {
   count: number;

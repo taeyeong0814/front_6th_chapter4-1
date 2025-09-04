@@ -1,13 +1,11 @@
 import { http, HttpResponse } from "msw";
 import items from "./items.json" with { type: "json" };
-import type { StringRecord } from "../types.ts";
-import type { Product } from "../entities";
 
 const delay = async () => await new Promise((resolve) => setTimeout(resolve, 200));
 
 // 카테고리 추출 함수
 function getUniqueCategories() {
-  const categories: Record<string, Record<string, string | StringRecord>> = {};
+  const categories = {};
 
   items.forEach((item) => {
     const cat1 = item.category1;
@@ -21,7 +19,7 @@ function getUniqueCategories() {
 }
 
 // 상품 검색 및 필터링 함수
-function filterProducts(products: Product[], query: Record<string, string>) {
+function filterProducts(products, query) {
   let filtered = [...products];
 
   // 검색어 필터링

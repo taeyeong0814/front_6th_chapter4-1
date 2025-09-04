@@ -1,82 +1,113 @@
 import { renderToString } from "react-dom/server";
-import { HomePage, NotFoundPage, ProductDetailPage } from "./pages/index";
-import items from "./mocks/items.json";
+import { App } from "./App";
+import { router } from "./router";
+import { loadHomePageData, loadProductDetailData } from "./services/ssr-data";
+import { PRODUCT_ACTIONS, productStore } from "./entities";
+import { HomePage, ProductDetailPage } from "./pages";
+import type { QueryPayload } from "@hanghae-plus/lib";
 
-// ===== 메인 렌더링 함수 =====
-export async function render(url: string) {
+export const render = async (url: string, query: QueryPayload) => {
+  // URL 보정: 빈 문자열인 경우 "/", "/"로 시작하지 않으면 "/" 추가
+  const actualUrl = url;
+
+  // URL에서 쿼리 파라미터 파싱
+  const urlObj = new URL(url, "http://localhost");
+  const searchQuery = urlObj.searchParams.get("search") || "";
+  const category1 = urlObj.searchParams.get("category1") || "";
+  const category2 = urlObj.searchParams.get("category2") || "";
+  const sort = urlObj.searchParams.get("sort") || "price_asc";
+  const limit = parseInt(urlObj.searchParams.get("limit") || "20");
+
+  // SSR에서도 라우터 시작 (start 메소드는 SSR 안전하게 수정됨)
+  router.push(url);
+  router.query = { ...query };
+
+  // URL에 따라 필요한 데이터 미리 로드
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let initialData: any = {};
+
   try {
-    const pathname = url.replace(/^\/+/, "/");
-
-    // 홈페이지
-    if (pathname === "/" || pathname === "") {
-      const initialData = {
-        products: items.slice(0, 20), // 처음 20개 상품
-        categories: getUniqueCategories(),
-        totalCount: items.length,
-      };
-
-      return {
-        initialData,
-        html: renderToString(<HomePage products={items.slice(0, 20)} totalCount={items.length} />),
-        head: "<title>쇼핑몰 - 홈</title>",
-      };
-    }
-
-    // 상품 상세 페이지
-    const productIdMatch = pathname.match(/^\/product\/([^/]+)\/?$/);
-    if (productIdMatch) {
-      const id = productIdMatch[1];
-      const product = items.find((p) => p.productId === id);
-
-      if (!product) {
-        return {
-          initialData: { error: "Product not found" },
-          html: renderToString(<NotFoundPage />),
-          head: "<title>상품을 찾을 수 없습니다 - 쇼핑몰</title>",
+    // URL 패턴에 따라 데이터 로드
+    if (router.target === HomePage) {
+      // 홈페이지 - 상품 목록 데이터 로드
+      const homeData = await loadHomePageData(actualUrl);
+      if (homeData) {
+        // 검색 필터 정보를 포함한 initialData 생성
+        initialData = {
+          ...homeData,
+          filters: {
+            searchQuery,
+            category: { category1, category2 },
+            sort,
+            limit,
+          },
         };
+
+        // SSR 시 스토어를 미리 초기화
+        productStore.dispatch({
+          type: PRODUCT_ACTIONS.SETUP,
+          payload: {
+            products: homeData.products,
+            categories: homeData.categories,
+            totalCount: homeData.totalCount,
+            loading: false,
+            status: "done",
+            error: null,
+          },
+        });
       }
+    } else if (router.target === ProductDetailPage) {
+      // 상품 상세 페이지 - 해당 상품 데이터 로드
+      const productId = router.params.id;
+      const productData = await loadProductDetailData(productId);
+      if (productData) {
+        initialData = productData;
 
-      const initialData = {
-        currentProduct: product,
-        products: items.filter((p) => p.productId !== id).slice(0, 4), // 관련 상품 4개
-      };
+        // SSR 시 스토어를 미리 초기화
+        productStore.dispatch({
+          type: PRODUCT_ACTIONS.SET_CURRENT_PRODUCT,
+          payload: productData.currentProduct,
+        });
 
-      return {
-        initialData,
-        html: renderToString(
-          <ProductDetailPage currentProduct={product} products={items.filter((p) => p.productId !== id).slice(0, 4)} />,
-        ),
-        head: `<title>${product.title} - 쇼핑몰</title>`,
-      };
+        if (productData.relatedProducts) {
+          productStore.dispatch({
+            type: PRODUCT_ACTIONS.SET_RELATED_PRODUCTS,
+            payload: productData.relatedProducts,
+          });
+        }
+      }
     }
 
-    // 404 페이지
+    // 실제 App 컴포넌트를 SSR로 렌더링
+    const html = renderToString(<App />);
+
+    // 페이지별 meta title 생성
+    let pageTitle = "React Shopping App";
+    if (router.target === HomePage) {
+      pageTitle = "쇼핑몰 - 홈";
+    } else if (router.target === ProductDetailPage) {
+      const productName = initialData?.currentProduct?.title || "상품";
+      pageTitle = `${productName} - 쇼핑몰`;
+    } else if (!router.target) {
+      pageTitle = "404 - Page Not Found";
+    }
+
     return {
-      initialData: {},
-      html: renderToString(<NotFoundPage />),
-      head: "<title>페이지 없음 - 쇼핑몰</title>",
+      html,
+      head: `<title>${pageTitle}</title>`,
+      initialData,
     };
   } catch (error) {
-    console.error("❌ SSR 에러:", error);
+    const err = error as Error;
+    console.error("SSR 렌더링 오류:", error);
+    console.error("Error stack:", err.stack);
+    console.error("Error message:", err.message);
+
+    // 오류 발생 시 기본 HTML 반환
     return {
-      head: "<title>에러</title>",
-      html: renderToString(<NotFoundPage />),
-      initialData: { error: (error as Error).message },
+      html: `<div>페이지를 불러오는 중 오류가 발생했습니다: ${err.message}</div>`,
+      head: `<title>React Shopping App</title>`,
+      initialData: {},
     };
   }
-}
-
-// 카테고리 추출 함수
-function getUniqueCategories() {
-  const categories: Record<string, Record<string, string | undefined>> = {};
-
-  items.forEach((item: { category1: string; category2: string }) => {
-    const cat1 = item.category1;
-    const cat2 = item.category2;
-
-    if (!categories[cat1]) categories[cat1] = {};
-    if (cat2 && !categories[cat1][cat2]) categories[cat1][cat2] = undefined;
-  });
-
-  return categories;
-}
+};

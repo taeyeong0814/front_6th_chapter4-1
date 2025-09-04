@@ -6,12 +6,18 @@ declare global {
   }
 }
 
-window.__spyCalls = [];
-window.__spyCallsClear = () => {
+// SSR 환경에서 window 객체 체크
+if (typeof window !== "undefined") {
   window.__spyCalls = [];
-};
+  window.__spyCallsClear = () => {
+    window.__spyCalls = [];
+  };
+}
 
 export const log: typeof console.log = (...args) => {
-  window.__spyCalls.push(args);
+  // SSR 환경에서는 spyCalls 기능 무시
+  if (typeof window !== "undefined") {
+    window.__spyCalls.push(args);
+  }
   return console.log(...args);
 };

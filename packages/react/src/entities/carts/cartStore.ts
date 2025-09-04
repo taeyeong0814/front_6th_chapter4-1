@@ -17,6 +17,8 @@ export const CART_ACTIONS = {
   // 상태 동기화
   LOAD_FROM_STORAGE: "cart/loadFromStorage",
   SYNC_TO_STORAGE: "cart/syncToStorage",
+
+  SETUP: "cart/setup",
 } as const;
 
 const initialState = {
@@ -134,6 +136,9 @@ const cartReducer = (state: typeof initialState, action: any) => {
         ...state,
         ...action.payload,
       };
+
+    case CART_ACTIONS.SETUP:
+      return { ...state, ...action.payload };
 
     default:
       return state;
