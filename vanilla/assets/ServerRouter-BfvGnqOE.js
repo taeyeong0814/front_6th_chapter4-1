@@ -1,0 +1,1 @@
+import{b as e,c as t,d as n,e as r}from"./index-BEwtkDWA.js";export{e as ServerRouter,t as getCategoriesSSR,n as getProductSSR,r as getProductsSSR};
