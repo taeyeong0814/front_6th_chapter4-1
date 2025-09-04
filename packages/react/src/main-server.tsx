@@ -3,15 +3,12 @@ import { App } from "./App";
 import { router } from "./router";
 import { loadHomePageData, loadProductDetailData } from "./services/ssr-data";
 import { PRODUCT_ACTIONS, productStore } from "./entities";
-import { HomePage, ProductDetailPage } from "./pages";
 import type { QueryPayload } from "@hanghae-plus/lib";
 
 export const render = async (url: string, query: QueryPayload) => {
-  // URL 보정: 빈 문자열인 경우 "/", "/"로 시작하지 않으면 "/" 추가
-  const actualUrl = url;
-
   // URL에서 쿼리 파라미터 파싱
   const urlObj = new URL(url, "http://localhost");
+  const pathname = urlObj.pathname;
   const searchQuery = urlObj.searchParams.get("search") || "";
   const category1 = urlObj.searchParams.get("category1") || "";
   const category2 = urlObj.searchParams.get("category2") || "";
@@ -27,14 +24,47 @@ export const render = async (url: string, query: QueryPayload) => {
   let initialData: any = {};
 
   try {
-    // URL 패턴에 따라 데이터 로드
-    if (router.target === HomePage) {
+    // URL 패턴 기반으로 직접 분기 처리 (Universal Router)
+    if (pathname === "/" || pathname === "" || pathname === "/front_6th_chapter4-1/react/") {
       // 홈페이지 - 상품 목록 데이터 로드
-      const homeData = await loadHomePageData(actualUrl);
+      const homeData = await loadHomePageData(url);
       if (homeData) {
+        // 검색 및 필터링 적용
+        let filteredProducts = homeData.products;
+
+        if (searchQuery) {
+          filteredProducts = filteredProducts.filter((product) =>
+            product.title.toLowerCase().includes(searchQuery.toLowerCase()),
+          );
+        }
+
+        if (category1) {
+          filteredProducts = filteredProducts.filter((product) => product.category1 === category1);
+        }
+
+        if (category2) {
+          filteredProducts = filteredProducts.filter((product) => product.category2 === category2);
+        }
+
+        // 정렬 적용
+        if (sort === "price_desc") {
+          filteredProducts.sort((a, b) => parseInt(b.lprice) - parseInt(a.lprice));
+        } else if (sort === "name_asc") {
+          filteredProducts.sort((a, b) => a.title.localeCompare(b.title));
+        } else if (sort === "name_desc") {
+          filteredProducts.sort((a, b) => b.title.localeCompare(a.title));
+        } else {
+          filteredProducts.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
+        }
+
+        // 개수 제한 적용
+        filteredProducts = filteredProducts.slice(0, limit);
+
         // 검색 필터 정보를 포함한 initialData 생성
         initialData = {
           ...homeData,
+          products: filteredProducts,
+          totalCount: filteredProducts.length,
           filters: {
             searchQuery,
             category: { category1, category2 },
@@ -47,18 +77,18 @@ export const render = async (url: string, query: QueryPayload) => {
         productStore.dispatch({
           type: PRODUCT_ACTIONS.SETUP,
           payload: {
-            products: homeData.products,
+            products: filteredProducts,
             categories: homeData.categories,
-            totalCount: homeData.totalCount,
+            totalCount: filteredProducts.length,
             loading: false,
             status: "done",
             error: null,
           },
         });
       }
-    } else if (router.target === ProductDetailPage) {
+    } else if (pathname.startsWith("/product/") || pathname.includes("/product/")) {
       // 상품 상세 페이지 - 해당 상품 데이터 로드
-      const productId = router.params.id;
+      const productId = pathname.split("/product/")[1]?.replace("/", "") || "";
       const productData = await loadProductDetailData(productId);
       if (productData) {
         initialData = productData;
@@ -83,12 +113,12 @@ export const render = async (url: string, query: QueryPayload) => {
 
     // 페이지별 meta title 생성
     let pageTitle = "React Shopping App";
-    if (router.target === HomePage) {
+    if (pathname === "/" || pathname === "" || pathname === "/front_6th_chapter4-1/react/") {
       pageTitle = "쇼핑몰 - 홈";
-    } else if (router.target === ProductDetailPage) {
+    } else if (pathname.startsWith("/product/") || pathname.includes("/product/")) {
       const productName = initialData?.currentProduct?.title || "상품";
       pageTitle = `${productName} - 쇼핑몰`;
-    } else if (!router.target) {
+    } else if (!pathname) {
       pageTitle = "404 - Page Not Found";
     }
 
